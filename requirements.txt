@@ -9,6 +9,7 @@ streamlit>=1.38.0
 tavily-python>=0.5.0
 
 # Web scraping & parsing
+readability-lxml>=0.8.1
 trafilatura>=1.12.0
 beautifulsoup4>=4.12.0
 lxml>=5.2.0
