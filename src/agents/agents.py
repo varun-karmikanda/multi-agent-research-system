@@ -1,49 +1,46 @@
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
-from langchain_prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from tools.tools import web_search, scrape_url
+from src.tools.tools import web_search, scrape_url
 from src.config import settings
 
-llm = ChatGroq(
-    api_key=settings.groq_api_key.get_secret_value(),
-    model=settings.groq_model.get_secret_value(),
-    temperature=0.0,
-    max_output_tokens=1024,
-)
+def make_llm(max_tokens: int) -> ChatGroq:
+    return ChatGroq(
+        api_key=settings.groq_api_key.get_secret_value(),
+        model=settings.groq_model.get_secret_value(),
+        temperature=0.0,
+        max_tokens=max_tokens,
+        max_retries=6,
+    )
+
+
+agent_llm = make_llm(512)
+writer_llm = make_llm(2000)
+critic_llm = make_llm(400)
 
 # Agent1: Web Search and Scraping Agent
 def build_search_agent():
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful assistant that can search the web and scrape content from URLs."),
-            ("human", "{input}"),
-        ]
-    )
-    
     agent = create_agent(
-        llm=llm,
+        model=agent_llm,
         tools=[web_search, scrape_url],
-        prompt=prompt,
-        output_parser=StrOutputParser(),
+        system_prompt="You are a helpful assistant that can search the web and scrape content from URLs.",
     )
     
     return agent
 
 #2 Agent 2: Reader Agent
 def build_reader_agent():
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful assistant that can read and summarize content from URLs."),
-            ("human", "{input}"),
-        ]
-    )
-    
     agent = create_agent(
-        llm=llm,
+        model=agent_llm,
         tools=[scrape_url],
-        prompt=prompt,
-        output_parser=StrOutputParser(),
+        system_prompt=(
+            "You are a web-page reader. The user will provide search results containing URLs. "
+            "Select the most relevant URLs, then call scrape_url once per URL. "
+            "The scrape_url tool accepts exactly one argument named 'url', whose value must "
+            "be the complete URL string. Never call scrape_url with query, topn, source, or "
+            "any other arguments. After scraping, summarize the returned page content."
+        ),
     )
     
     return agent
@@ -73,7 +70,7 @@ Be detailed and professional in your writing. Ensure that the report is well-org
     ]
 )
 
-writer_chain = writer_prompt | llm | StrOutputParser()
+writer_chain = writer_prompt | writer_llm | StrOutputParser()
 
 
 # Critic chain
@@ -100,4 +97,4 @@ One line verdict: [Acceptable/Needs Improvement/Unacceptable]"""),
     ]
 )
 
-critic_chain = critic_prompt | llm | StrOutputParser()
+critic_chain = critic_prompt | critic_llm | StrOutputParser()

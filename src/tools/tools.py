@@ -9,6 +9,8 @@ import trafilatura
 import re
 from langchain.tools import tool
 
+MAX_CHARS = 2500  # ~600 tokens per page
+
 tavily = TavilyClient(api_key=settings.tavily_api_key.get_secret_value())
 
 @tool
@@ -28,8 +30,9 @@ def web_search(query: str, max_results: int = 5) -> str:
 @tool
 def scrape_url(url: str) -> str:
     """
-    Scrape and extract clean readable content from a URL.
-    Uses multiple fallback extraction strategies for reliability.
+    Scrape one web page using its complete URL.
+    Call this tool with exactly one argument, ``url``. Do not pass a query,
+    search options, or any other arguments.
     """
     headers = {
         "User-Agent": (
@@ -60,7 +63,7 @@ def scrape_url(url: str) -> str:
         )
 
         if extracted and len(extracted.strip()) > 200:
-            return re.sub(r"\s+", " ", extracted).strip()[:5000]
+            return re.sub(r"\s+", " ", extracted).strip()[:MAX_CHARS]
 
         # ── Strategy 2: Readability + BeautifulSoup ─────────────────────
         doc = Document(html)
@@ -71,7 +74,7 @@ def scrape_url(url: str) -> str:
         text = soup.get_text(separator=" ", strip=True)
 
         if text and len(text) > 200:
-            return re.sub(r"\s+", " ", text).strip()[:5000]
+            return re.sub(r"\s+", " ", text).strip()[:MAX_CHARS]
 
         # ── Strategy 3: Fallback Full Page Extraction ───────────────────
         full_soup = BeautifulSoup(html, "lxml")
@@ -80,7 +83,7 @@ def scrape_url(url: str) -> str:
         fallback_text = full_soup.get_text(separator=" ", strip=True)
         cleaned = re.sub(r"\s+", " ", fallback_text).strip()
 
-        return cleaned[:5000] if cleaned else "Could not extract meaningful content from the page."
+        return cleaned[:MAX_CHARS] if cleaned else "Could not extract meaningful content from the page."
 
     except requests.exceptions.Timeout:
         return "Error: Request timed out while scraping the URL."
