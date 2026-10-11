@@ -1,9 +1,7 @@
 from src.tools.tools import web_search, scrape_url
 from rich import print
+from src.pipelines.pipelines import run_multi_agent_research_system
 
-# res = web_search("super cars", 2)
-# print(res)
-
-# print(scrape_url("https://www.langchain.com/langgraph"))
-
-print(web_search.invoke("super cars"))
+topic = "LLM based multi-agent systems"
+results = run_multi_agent_research_system(topic=topic)
+print(f"\nFinal Research Report for topic '{topic}':\n{results['report']}\n")
